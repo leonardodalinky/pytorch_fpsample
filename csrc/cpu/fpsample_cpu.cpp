@@ -1,4 +1,4 @@
-#include "fpsample_cpu.h"
+#include <torch/library.h>
 
 #include "../utils.h"
 #include "bucket_fps/wrapper.h"
@@ -13,8 +13,9 @@ std::tuple<Tensor, Tensor> sample_cpu(const Tensor &x, int64_t k,
                 x.device());
     TORCH_CHECK(x.dim() >= 2,
                 "x must have at least 2 dims, but got size: ", x.sizes());
-    auto [old_size, x_reshaped] = bnorm_reshape(
-        x.to(torch::kFloat32, false, false, torch::MemoryFormat::Contiguous));
+    auto [old_size, x_reshaped_raw] = bnorm_reshape(x);
+    auto x_reshaped = x_reshaped_raw.to(torch::kFloat32, false, false,
+                                        torch::MemoryFormat::Contiguous);
 
     auto height = h.value_or(5);
 
@@ -32,7 +33,7 @@ std::tuple<Tensor, Tensor> sample_cpu(const Tensor &x, int64_t k,
     if (backend == "bucket") {
         backend_func = &bucket_fps_kdline;
     } else if (backend == "naive") {
-        // TODO: native
+        // TODO: naive
         TORCH_CHECK(false, "Not implemented yet");
     } else {
         TORCH_CHECK(false, "Unknown backend: ", backend);
@@ -40,16 +41,23 @@ std::tuple<Tensor, Tensor> sample_cpu(const Tensor &x, int64_t k,
 
     if (x_reshaped.size(0) == 1) {
         // single batch
-        backend_func(x.const_data_ptr<float>(), x_reshaped.size(1),
+        backend_func(x_reshaped.const_data_ptr<float>(), x_reshaped.size(1),
                      x_reshaped.size(2), k, cur_start_idx, height,
                      ret_indices.mutable_data_ptr<int64_t>());
     } else {
-        // TODO: torch::parallel_for
-        TORCH_CHECK(false, "Not implemented yet");
+        torch::parallel_for(
+            0, x_reshaped.size(0), 0, [&](int64_t start, int64_t end) {
+                for (auto i = start; i < end; i++) {
+                    backend_func(x_reshaped[i].const_data_ptr<float>(),
+                                 x_reshaped.size(1), x_reshaped.size(2), k,
+                                 cur_start_idx, height,
+                                 ret_indices[i].mutable_data_ptr<int64_t>());
+                }
+            });
     }
 
     Tensor ret_tensor = torch::gather(
-        x_reshaped, 1,
+        x_reshaped_raw, 1,
         ret_indices.view({ret_indices.size(0), ret_indices.size(1), 1})
             .repeat({1, 1, x_reshaped.size(2)}));
 
@@ -63,3 +71,5 @@ std::tuple<Tensor, Tensor> sample_cpu(const Tensor &x, int64_t k,
     return std::make_tuple(ret_tensor.view(ret_tensor_sizes),
                            ret_indices.view(ret_indices_sizes));
 }
+
+TORCH_LIBRARY_IMPL(torch_fpsample, CPU, m) { m.impl("sample", &sample_cpu); }
