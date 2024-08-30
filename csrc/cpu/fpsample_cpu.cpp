@@ -5,6 +5,12 @@
 
 using torch::Tensor;
 
+///////////////
+//           //
+//    CPU    //
+//           //
+///////////////
+
 std::tuple<Tensor, Tensor> sample_cpu(const Tensor &x, int64_t k,
                                       torch::optional<int64_t> h,
                                       torch::optional<int64_t> start_idx,
@@ -68,8 +74,9 @@ std::tuple<Tensor, Tensor> sample_cpu(const Tensor &x, int64_t k,
     ret_indices_sizes.pop_back();
     ret_indices_sizes[ret_indices_sizes.size() - 1] = k;
 
-    return std::make_tuple(ret_tensor.view(ret_tensor_sizes),
-                           ret_indices.view(ret_indices_sizes));
+    return std::make_tuple(
+        ret_tensor.view(ret_tensor_sizes),
+        ret_indices.view(ret_indices_sizes).to(torch::kLong));
 }
 
 TORCH_LIBRARY_IMPL(torch_fpsample, CPU, m) { m.impl("sample", &sample_cpu); }
