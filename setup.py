@@ -12,6 +12,7 @@ WITH_CUDA = False
 sources = [
     "csrc/fpsample.cpp",
     "csrc/fpsample_autograd.cpp",
+    "csrc/fpsample_meta.cpp",
     "csrc/cpu/fpsample_cpu.cpp",
     "csrc/cpu/bucket_fps/wrapper.cpp",
 ]
