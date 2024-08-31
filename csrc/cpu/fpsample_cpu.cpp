@@ -21,8 +21,7 @@ std::tuple<Tensor, Tensor> sample_cpu(const Tensor &x, int64_t k,
                 "x must have at least 2 dims, but got size: ", x.sizes());
     TORCH_CHECK(k >= 1, "k must be greater than or equal to 1, but got ", k);
     auto [old_size, x_reshaped_raw] = bnorm_reshape(x);
-    auto x_reshaped = x_reshaped_raw.to(torch::kFloat32, false, false,
-                                        torch::MemoryFormat::Contiguous);
+    auto x_reshaped = x_reshaped_raw.to(torch::kFloat32).contiguous();
 
     auto height = h.value_or(5);
 
