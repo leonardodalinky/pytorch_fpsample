@@ -1,6 +1,6 @@
 //
 // Created by hanm on 22-6-15.
-// Refactored by AyajiLin on 2023/9/16.
+// Refactored by AyajiLin on 2024/09/03.
 //
 
 #pragma once
@@ -10,14 +10,14 @@
 
 #include "KDTreeBase.h"
 
-namespace quickfps {
+namespace quickfps::dynamic {
 
-template <typename T, size_t DIM, typename S = T>
-class KDLineTree : public KDTreeBase<T, DIM, S> {
+template <typename T, typename S = T>
+class KDLineTree : public KDTreeBase<T, S> {
   public:
-    using typename KDTreeBase<T, DIM, S>::_Point;
-    using typename KDTreeBase<T, DIM, S>::_Points;
-    using typename KDTreeBase<T, DIM, S>::NodePtr;
+    using typename KDTreeBase<T, S>::_Point;
+    using typename KDTreeBase<T, S>::_Points;
+    using typename KDTreeBase<T, S>::NodePtr;
 
     KDLineTree(_Points data, size_t pointSize, size_t treeHigh,
                _Points samplePoints);
@@ -40,21 +40,20 @@ class KDLineTree : public KDTreeBase<T, DIM, S> {
     void addNode(NodePtr p) override;
 };
 
-template <typename T, size_t DIM, typename S>
-KDLineTree<T, DIM, S>::KDLineTree(_Points data, size_t pointSize,
-                                  size_t treeHigh, _Points samplePoints)
-    : KDTreeBase<T, DIM, S>(data, pointSize, samplePoints), high_(treeHigh) {
+template <typename T, typename S>
+KDLineTree<T, S>::KDLineTree(_Points data, size_t pointSize, size_t treeHigh,
+                             _Points samplePoints)
+    : KDTreeBase<T, S>(data, pointSize, samplePoints), high_(treeHigh) {
     KDNode_list.clear();
 }
 
-template <typename T, size_t DIM, typename S>
-KDLineTree<T, DIM, S>::~KDLineTree() {
+template <typename T, typename S> KDLineTree<T, S>::~KDLineTree() {
     KDNode_list.clear();
 }
 
-template <typename T, size_t DIM, typename S>
-typename KDLineTree<T, DIM, S>::_Point KDLineTree<T, DIM, S>::max_point() {
-    _Point tmpPoint;
+template <typename T, typename S>
+typename KDLineTree<T, S>::_Point KDLineTree<T, S>::max_point() {
+    _Point tmpPoint(this->dim());
     S max_distance = std::numeric_limits<S>::lowest();
     for (const auto &bucket : KDNode_list) {
         if (bucket->max_point.dis > max_distance) {
@@ -65,29 +64,27 @@ typename KDLineTree<T, DIM, S>::_Point KDLineTree<T, DIM, S>::max_point() {
     return tmpPoint;
 }
 
-template <typename T, size_t DIM, typename S>
-void KDLineTree<T, DIM, S>::update_distance(const _Point &ref_point) {
+template <typename T, typename S>
+void KDLineTree<T, S>::update_distance(const _Point &ref_point) {
     for (const auto &bucket : KDNode_list) {
         bucket->send_delay_point(ref_point);
         bucket->update_distance();
     }
 }
 
-template <typename T, size_t DIM, typename S>
-void KDLineTree<T, DIM, S>::sample(size_t sample_num) {
-    _Point ref_point;
+template <typename T, typename S>
+void KDLineTree<T, S>::sample(size_t sample_num) {
     for (size_t i = 1; i < sample_num; i++) {
-        ref_point = this->max_point();
+        _Point ref_point = this->max_point();
         this->sample_points[i] = ref_point;
         this->update_distance(ref_point);
     }
 }
 
-template <typename T, size_t DIM, typename S>
-void KDLineTree<T, DIM, S>::addNode(NodePtr p) {
+template <typename T, typename S> void KDLineTree<T, S>::addNode(NodePtr p) {
     size_t nodeIdx = KDNode_list.size();
     p->idx = nodeIdx;
     KDNode_list.push_back(p);
 }
 
-} // namespace quickfps
+} // namespace quickfps::dynamic

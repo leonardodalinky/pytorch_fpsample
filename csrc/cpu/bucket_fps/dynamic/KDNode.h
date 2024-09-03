@@ -1,6 +1,6 @@
 //
 // Created by 韩萌 on 2022/6/14.
-// Refactored by AyajiLin on 2023/9/16.
+// Refactored by AyajiLin on 2024/09/03.
 //
 
 #pragma once
@@ -12,17 +12,17 @@
 #include "Interval.h"
 #include "Point.h"
 
-namespace quickfps {
+namespace quickfps::dynamic {
 
-template <typename T, size_t DIM, typename S> class KDNode {
+template <typename T, typename S> class KDNode {
   public:
-    using _Point = Point<T, DIM, S>;
+    using _Point = Point<T, S>;
     using _Points = _Point *;
     _Points points;
     size_t pointLeft, pointRight;
     size_t idx;
 
-    std::array<Interval<T>, DIM> bboxs;
+    std::vector<Interval<T>> bboxs;
     std::vector<_Point> waitpoints;
     std::vector<_Point> delaypoints;
     _Point max_point;
@@ -33,9 +33,11 @@ template <typename T, size_t DIM, typename S> class KDNode {
 
     KDNode(const KDNode &a);
 
-    KDNode(const std::array<Interval<T>, DIM> &bboxs);
+    KDNode(const std::vector<Interval<T>> &bboxs);
 
     void init(const _Point &ref);
+
+    size_t dim() const { return max_point.dim(); };
 
     void updateMaxPoint(const _Point &lpoint, const _Point &rpoint) {
         if (lpoint.dis > rpoint.dis)
@@ -57,31 +59,24 @@ template <typename T, size_t DIM, typename S> class KDNode {
     size_t size() const;
 };
 
-template <typename T, size_t DIM, typename S>
-KDNode<T, DIM, S>::KDNode()
+template <typename T, typename S>
+KDNode<T, S>::KDNode()
     : points(nullptr), pointLeft(0), pointRight(0), left(nullptr),
-      right(nullptr) {}
+      right(nullptr), max_point(0) {}
 
-template <typename T, size_t DIM, typename S>
-KDNode<T, DIM, S>::KDNode(const std::array<Interval<T>, DIM> &other_bboxs)
+template <typename T, typename S>
+KDNode<T, S>::KDNode(const std::vector<Interval<T>> &other_bboxs)
     : points(nullptr), pointLeft(0), pointRight(0), left(nullptr),
-      right(nullptr) {
-    std::copy(other_bboxs.cbegin(), other_bboxs.cend(), this->bboxs.begin());
-}
+      right(nullptr), bboxs(other_bboxs), max_point(other_bboxs.size()) {}
 
-template <typename T, size_t DIM, typename S>
-KDNode<T, DIM, S>::KDNode(const KDNode &a)
+template <typename T, typename S>
+KDNode<T, S>::KDNode(const KDNode &a)
     : points(a.points), pointLeft(a.pointLeft), pointRight(a.pointRight),
-      left(a.left), right(a.right), idx(a.idx) {
-    std::copy(a.bboxs.cbegin(), a.bboxs.cend(), this->bboxs.begin());
-    std::copy(a.waitpoints.cbegin(), a.waitpoints.cend(),
-              this->waitpoints.begin());
-    std::copy(a.delaypoints.cbegin(), a.delaypoints.cend(),
-              this->delaypoints.begin());
-}
+      left(a.left), right(a.right), idx(a.idx), bboxs(a.bboxs),
+      waitpoints(a.waitpoints), delaypoints(a.delaypoints),
+      max_point(a.max_point) {}
 
-template <typename T, size_t DIM, typename S>
-void KDNode<T, DIM, S>::init(const _Point &ref) {
+template <typename T, typename S> void KDNode<T, S>::init(const _Point &ref) {
     waitpoints.clear();
     delaypoints.clear();
     if (this->left && this->right) {
@@ -101,11 +96,11 @@ void KDNode<T, DIM, S>::init(const _Point &ref) {
     }
 }
 
-template <typename T, size_t DIM, typename S>
-S KDNode<T, DIM, S>::bound_distance(const _Point &ref_point) const {
+template <typename T, typename S>
+S KDNode<T, S>::bound_distance(const _Point &ref_point) const {
     S bound_dis(0);
     S dim_distance;
-    for (size_t cur_dim = 0; cur_dim < DIM; cur_dim++) {
+    for (size_t cur_dim = 0; cur_dim < dim(); cur_dim++) {
         dim_distance = 0;
         if (ref_point[cur_dim] > this->bboxs[cur_dim].high)
             dim_distance = ref_point[cur_dim] - this->bboxs[cur_dim].high;
@@ -116,8 +111,7 @@ S KDNode<T, DIM, S>::bound_distance(const _Point &ref_point) const {
     return bound_dis;
 }
 
-template <typename T, size_t DIM, typename S>
-void KDNode<T, DIM, S>::update_distance() {
+template <typename T, typename S> void KDNode<T, S>::update_distance() {
     for (const auto &ref_point : this->waitpoints) {
         S lastmax_distance = this->max_point.dis;
         S cur_distance = this->max_point.distance(ref_point);
@@ -164,7 +158,7 @@ void KDNode<T, DIM, S>::update_distance() {
     this->waitpoints.clear();
 }
 
-template <typename T, size_t DIM, typename S> void KDNode<T, DIM, S>::reset() {
+template <typename T, typename S> void KDNode<T, S>::reset() {
     for (size_t i = pointLeft; i < pointRight; i++) {
         points[i].reset();
     }
@@ -177,11 +171,10 @@ template <typename T, size_t DIM, typename S> void KDNode<T, DIM, S>::reset() {
     }
 }
 
-template <typename T, size_t DIM, typename S>
-size_t KDNode<T, DIM, S>::size() const {
+template <typename T, typename S> size_t KDNode<T, S>::size() const {
     if (this->left && this->right)
         return this->left->size() + this->right->size();
     return (pointRight - pointLeft);
 }
 
-} // namespace quickfps
+} // namespace quickfps::dynamic

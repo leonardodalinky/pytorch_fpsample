@@ -1,6 +1,6 @@
 //
 // Created by 韩萌 on 2022/6/14.
-// Refactored by AyajiLin on 2023/9/16.
+// Refactored by AyajiLin on 2024/09/03.
 //
 
 #pragma once
@@ -11,13 +11,13 @@
 #include <array>
 #include <numeric>
 
-namespace quickfps {
+namespace quickfps::dynamic {
 
-template <typename T, size_t DIM, typename S> class KDTreeBase {
+template <typename T, typename S> class KDTreeBase {
   public:
-    using _Point = Point<T, DIM, S>;
+    using _Point = Point<T, S>;
     using _Points = _Point *;
-    using NodePtr = KDNode<T, DIM, S> *;
+    using NodePtr = KDNode<T, S> *;
     using _Interval = Interval<T>;
 
     size_t pointSize;
@@ -36,6 +36,8 @@ template <typename T, size_t DIM, typename S> class KDTreeBase {
 
     void init(const _Point &ref);
 
+    size_t dim() const { return points_[0].dim(); }
+
     virtual _Point max_point() = 0;
 
     virtual void sample(size_t sample_num) = 0;
@@ -47,32 +49,29 @@ template <typename T, size_t DIM, typename S> class KDTreeBase {
     virtual void update_distance(const _Point &ref_point) = 0;
 
     NodePtr divideTree(ssize_t left, ssize_t right,
-                       const std::array<_Interval, DIM> &bboxs,
-                       size_t curr_high);
+                       const std::vector<_Interval> &bboxs, size_t curr_high);
 
     size_t planeSplit(ssize_t left, ssize_t right, size_t split_dim,
                       T split_val);
 
     T qSelectMedian(size_t dim, size_t left, size_t right);
-    static size_t findSplitDim(const std::array<_Interval, DIM> &bboxs);
-    inline std::array<_Interval, DIM> computeBoundingBox(size_t left,
-                                                         size_t right);
+    static size_t findSplitDim(const std::vector<_Interval> &bboxs, size_t dim);
+    inline std::vector<_Interval> computeBoundingBox(size_t left, size_t right);
 };
 
-template <typename T, size_t DIM, typename S>
-KDTreeBase<T, DIM, S>::KDTreeBase(_Points data, size_t pointSize,
-                                  _Points samplePoints)
+template <typename T, typename S>
+KDTreeBase<T, S>::KDTreeBase(_Points data, size_t pointSize,
+                             _Points samplePoints)
     : pointSize(pointSize), sample_points(samplePoints), root_(nullptr),
       points_(data) {}
 
-template <typename T, size_t DIM, typename S>
-KDTreeBase<T, DIM, S>::~KDTreeBase() {
+template <typename T, typename S> KDTreeBase<T, S>::~KDTreeBase() {
     if (root_ != nullptr)
         deleteNode(root_);
 }
 
-template <typename T, size_t DIM, typename S>
-void KDTreeBase<T, DIM, S>::deleteNode(NodePtr node_p) {
+template <typename T, typename S>
+void KDTreeBase<T, S>::deleteNode(NodePtr node_p) {
     if (node_p->left)
         deleteNode(node_p->left);
     if (node_p->right)
@@ -80,20 +79,19 @@ void KDTreeBase<T, DIM, S>::deleteNode(NodePtr node_p) {
     delete node_p;
 }
 
-template <typename T, size_t DIM, typename S>
-void KDTreeBase<T, DIM, S>::buildKDtree() {
+template <typename T, typename S> void KDTreeBase<T, S>::buildKDtree() {
     size_t left = 0;
     size_t right = pointSize;
-    std::array<_Interval, DIM> bboxs = this->computeBoundingBox(left, right);
+    std::vector<_Interval> bboxs = this->computeBoundingBox(left, right);
     this->root_ = divideTree(left, right, bboxs, 0);
 }
 
-template <typename T, size_t DIM, typename S>
-typename KDTreeBase<T, DIM, S>::NodePtr
-KDTreeBase<T, DIM, S>::divideTree(ssize_t left, ssize_t right,
-                                  const std::array<_Interval, DIM> &bboxs,
-                                  size_t curr_high) {
-    NodePtr node = new KDNode<T, DIM, S>(bboxs);
+template <typename T, typename S>
+typename KDTreeBase<T, S>::NodePtr
+KDTreeBase<T, S>::divideTree(ssize_t left, ssize_t right,
+                             const std::vector<_Interval> &bboxs,
+                             size_t curr_high) {
+    NodePtr node = new KDNode<T, S>(bboxs);
 
     ssize_t count = right - left;
     if (this->leftNode(curr_high, count)) {
@@ -103,12 +101,12 @@ KDTreeBase<T, DIM, S>::divideTree(ssize_t left, ssize_t right,
         this->addNode(node);
         return node;
     } else {
-        size_t split_dim = this->findSplitDim(bboxs);
+        size_t split_dim = this->findSplitDim(bboxs, dim());
         T split_val = this->qSelectMedian(split_dim, left, right);
 
         size_t split_delta = planeSplit(left, right, split_dim, split_val);
 
-        std::array<_Interval, DIM> bbox_cur =
+        std::vector<_Interval> bbox_cur =
             this->computeBoundingBox(left, left + split_delta);
         node->left =
             this->divideTree(left, left + split_delta, bbox_cur, curr_high + 1);
@@ -119,9 +117,9 @@ KDTreeBase<T, DIM, S>::divideTree(ssize_t left, ssize_t right,
     }
 }
 
-template <typename T, size_t DIM, typename S>
-size_t KDTreeBase<T, DIM, S>::planeSplit(ssize_t left, ssize_t right,
-                                         size_t split_dim, T split_val) {
+template <typename T, typename S>
+size_t KDTreeBase<T, S>::planeSplit(ssize_t left, ssize_t right,
+                                    size_t split_dim, T split_val) {
     ssize_t start = left;
     ssize_t end = right - 1;
 
@@ -147,8 +145,8 @@ size_t KDTreeBase<T, DIM, S>::planeSplit(ssize_t left, ssize_t right,
     return static_cast<ssize_t>(lim1);
 }
 
-template <typename T, size_t DIM, typename S>
-T KDTreeBase<T, DIM, S>::qSelectMedian(size_t dim, size_t left, size_t right) {
+template <typename T, typename S>
+T KDTreeBase<T, S>::qSelectMedian(size_t dim, size_t left, size_t right) {
     T sum = std::accumulate(this->points_ + left, this->points_ + right, 0.0,
                             [dim](const T &acc, const _Point &point) {
                                 return acc + point.pos[dim];
@@ -156,14 +154,14 @@ T KDTreeBase<T, DIM, S>::qSelectMedian(size_t dim, size_t left, size_t right) {
     return sum / (right - left);
 }
 
-template <typename T, size_t DIM, typename S>
-size_t
-KDTreeBase<T, DIM, S>::findSplitDim(const std::array<_Interval, DIM> &bboxs) {
+template <typename T, typename S>
+size_t KDTreeBase<T, S>::findSplitDim(const std::vector<_Interval> &bboxs,
+                                      size_t dim) {
     T min_, max_;
     T span = 0;
     size_t best_dim = 0;
 
-    for (size_t cur_dim = 0; cur_dim < DIM; cur_dim++) {
+    for (size_t cur_dim = 0; cur_dim < dim; cur_dim++) {
         min_ = bboxs[cur_dim].low;
         max_ = bboxs[cur_dim].high;
         T cur_span = (max_ - min_);
@@ -177,27 +175,25 @@ KDTreeBase<T, DIM, S>::findSplitDim(const std::array<_Interval, DIM> &bboxs) {
     return best_dim;
 }
 
-template <typename T, size_t DIM, typename S>
-inline std::array<Interval<T>, DIM>
-KDTreeBase<T, DIM, S>::computeBoundingBox(size_t left, size_t right) {
-    T min_vals[DIM];
-    T max_vals[DIM];
-    std::fill(min_vals, min_vals + DIM, std::numeric_limits<T>::max());
-    std::fill(max_vals, max_vals + DIM, std::numeric_limits<T>::lowest());
+template <typename T, typename S>
+inline std::vector<Interval<T>>
+KDTreeBase<T, S>::computeBoundingBox(size_t left, size_t right) {
+    std::vector<T> min_vals(this->dim(), std::numeric_limits<T>::max());
+    std::vector<T> max_vals(this->dim(), std::numeric_limits<T>::lowest());
 
     for (size_t i = left; i < right; ++i) {
         const _Point &pos = points_[i];
 
-        for (size_t cur_dim = 0; cur_dim < DIM; cur_dim++) {
+        for (size_t cur_dim = 0; cur_dim < this->dim(); cur_dim++) {
             T val = pos[cur_dim];
             min_vals[cur_dim] = std::min(min_vals[cur_dim], val);
             max_vals[cur_dim] = std::max(max_vals[cur_dim], val);
         }
     }
 
-    std::array<_Interval, DIM> bboxs;
+    std::vector<_Interval> bboxs(dim());
 
-    for (size_t cur_dim = 0; cur_dim < DIM; cur_dim++) {
+    for (size_t cur_dim = 0; cur_dim < dim(); cur_dim++) {
         bboxs[cur_dim].low = min_vals[cur_dim];
         bboxs[cur_dim].high = max_vals[cur_dim];
     }
@@ -205,10 +201,10 @@ KDTreeBase<T, DIM, S>::computeBoundingBox(size_t left, size_t right) {
     return bboxs;
 }
 
-template <typename T, size_t DIM, typename S>
-void KDTreeBase<T, DIM, S>::init(const _Point &ref) {
+template <typename T, typename S>
+void KDTreeBase<T, S>::init(const _Point &ref) {
     this->sample_points[0] = ref;
     this->root_->init(ref);
 }
 
-} // namespace quickfps
+} // namespace quickfps::dynamic

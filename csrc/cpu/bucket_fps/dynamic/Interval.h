@@ -1,11 +1,11 @@
 //
 // Created by 韩萌 on 2022/6/14.
-// Refactored by AyajiLin on 2023/9/16.
+// Refactored by AyajiLin on 2024/09/03.
 //
 
 #pragma once
 
-namespace quickfps {
+namespace quickfps::dynamic {
 template <typename S> class Interval {
   public:
     S low, high;
@@ -13,4 +13,4 @@ template <typename S> class Interval {
     Interval(S low, S high) : low(low), high(high) {};
     Interval(const Interval &o) : low(o.low), high(o.high) {};
 };
-} // namespace quickfps
+} // namespace quickfps::dynamic

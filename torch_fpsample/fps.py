@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Literal
 
 import torch
 
@@ -8,7 +8,7 @@ def sample(
     k: int,
     h: Optional[int] = None,
     start_idx: Optional[int] = None,
-    backend: str = "bucket",
+    backend: Literal["bucket", "naive"] = "bucket",
 ) -> Tuple[torch.Tensor, torch.LongTensor]:
     """Farthest Point Sampling (FPS) algorithm.
 

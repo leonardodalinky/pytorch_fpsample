@@ -1,4 +1,5 @@
 #include "wrapper.h"
+#include "dynamic/KDLineTree.h"
 #include "static/KDLineTree.h"
 #include <array>
 #include <memory>
@@ -13,6 +14,15 @@ constexpr size_t max_dim = BUCKET_FPS_MAX_DIM;
 
 using quickfps::KDLineTree;
 using quickfps::Point;
+
+template <typename T, typename S>
+using DynPoint = quickfps::dynamic::Point<T, S>;
+
+//////////////////
+//              //
+//    Static    //
+//              //
+//////////////////
 
 template <typename T, size_t DIM, typename S>
 std::vector<Point<T, DIM, S>> raw_data_to_points(const float *raw_data,
@@ -31,10 +41,44 @@ void kdline_sample(const float *raw_data, size_t n_points, size_t dim,
                    size_t n_samples, size_t start_idx, size_t height,
                    int64_t *sampled_point_indices) {
     auto points = raw_data_to_points<T, DIM, S>(raw_data, n_points, dim);
-    std::unique_ptr<Point<T, DIM, S>[]> sampled_points(
-        new Point<T, DIM, S>[n_samples]);
+    auto sampled_points = std::make_unique<Point<T, DIM, S>[]>(n_samples);
     KDLineTree<T, DIM, S> tree(points.data(), n_points, height,
                                sampled_points.get());
+    tree.buildKDtree();
+    tree.init(points[start_idx]);
+    tree.sample(n_samples);
+    for (size_t i = 0; i < n_samples; i++) {
+        sampled_point_indices[i] = sampled_points[i].id;
+    }
+}
+
+///////////////////
+//               //
+//    Dynamic    //
+//               //
+///////////////////
+
+template <typename T, typename S>
+std::vector<DynPoint<T, S>>
+raw_data_to_points_varlen(const float *raw_data, size_t n_points, size_t dim) {
+    std::vector<DynPoint<T, S>> points;
+    points.reserve(n_points);
+    for (size_t i = 0; i < n_points; i++) {
+        const float *ptr = raw_data + i * dim;
+        points.push_back(DynPoint<T, S>(std::vector<T>(ptr, ptr + dim), i));
+    }
+    return points;
+}
+
+template <typename T, typename S = T>
+void kdline_sample_varlen(const float *raw_data, size_t n_points, size_t dim,
+                          size_t n_samples, size_t start_idx, size_t height,
+                          int64_t *sampled_point_indices) {
+    auto points = raw_data_to_points_varlen<T, S>(raw_data, n_points, dim);
+    auto sampled_points =
+        std::vector<DynPoint<T, S>>(n_samples, DynPoint<T, S>(dim));
+    quickfps::dynamic::KDLineTree<T, S> tree(points.data(), n_points, height,
+                                             sampled_points.data());
     tree.buildKDtree();
     tree.init(points[start_idx]);
     tree.sample(n_samples);
@@ -78,8 +122,6 @@ void bucket_fps_kdline(const float *raw_data, size_t n_points, size_t dim,
                        size_t n_samples, size_t start_idx, size_t height,
                        int64_t *sampled_point_indices) {
     TORCH_CHECK(dim > 0, "dim should be larger than 0");
-    TORCH_CHECK(dim <= max_dim, "dim should be smaller than or equal to ",
-                max_dim);
     TORCH_CHECK(n_points != 0, "n_points should be larger than 0");
     TORCH_CHECK(n_samples != 0, "n_samples should be larger than 0");
     TORCH_CHECK(height != 0, "height should be larger than 0");
@@ -91,7 +133,8 @@ void bucket_fps_kdline(const float *raw_data, size_t n_points, size_t dim,
         func_arr[dim - 1](raw_data, n_points, dim, n_samples, start_idx, height,
                           sampled_point_indices);
     } else {
-        // TODO: var dim
-        TORCH_CHECK(false, "Not implemented yet");
+        // var dim
+        kdline_sample_varlen<float>(raw_data, n_points, dim, n_samples,
+                                    start_idx, height, sampled_point_indices);
     }
 }

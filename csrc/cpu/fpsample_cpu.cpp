@@ -25,7 +25,7 @@ std::tuple<Tensor, Tensor> sample_cpu(const Tensor &x, int64_t k,
 
     auto height = h.value_or(5);
 
-    auto tmp = torch::randint(0, x_reshaped.size(0), {1},
+    auto tmp = torch::randint(0, x_reshaped.size(-2), {1},
                               x_reshaped.options().dtype(torch::kInt64));
     auto cur_start_idx = start_idx.value_or(tmp.const_data_ptr<int64_t>()[0]);
 

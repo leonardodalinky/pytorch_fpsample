@@ -3,13 +3,12 @@
 // Refactored by AyajiLin on 2023/9/16.
 //
 
-#ifndef KD_TREE_BASED_FARTHEST_POINT_SAMPLING_POINT_H
-#define KD_TREE_BASED_FARTHEST_POINT_SAMPLING_POINT_H
+#pragma once
 
-#include <cmath>
-#include <algorithm>
-#include <limits>
 #include "utils.h"
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 namespace quickfps {
 
@@ -23,7 +22,7 @@ template <typename T, size_t DIM, typename S = T> class Point {
     Point(const T pos[DIM], size_t id);
     Point(const T pos[DIM], size_t id, S dis);
     Point(const Point &obj);
-    ~Point(){};
+    ~Point() {};
 
     bool operator<(const Point &aii) const;
 
@@ -100,5 +99,3 @@ template <typename T, size_t DIM, typename S> void Point<T, DIM, S>::reset() {
 }
 
 } // namespace quickfps
-
-#endif // KD_TREE_BASED_FARTHEST_POINT_SAMPLING_POINT_H
