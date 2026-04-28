@@ -7,8 +7,7 @@ from torch.__config__ import parallel_info
 from torch.utils import cpp_extension
 
 __version__ = "0.1.0"
-# WITH_CUDA = os.getenv("WITH_CUDA", "1") == "1"
-WITH_CUDA = False
+WITH_CUDA = os.getenv("WITH_CUDA", "1") == "1"
 
 sources = [
     "csrc/fpsample.cpp",
@@ -40,9 +39,11 @@ if sys.platform == "darwin":
 
 
 if WITH_CUDA:
-    # TODO
-    raise NotImplementedError("CUDA is not supported yet.")
-    sources += []
+    sources += [
+        "csrc/cuda/fpsample_cuda.cpp",
+        "csrc/cuda/fpsample_cuda_kernel.cu",
+    ]
+    extra_compile_args["nvcc"] = ["-O3", "--expt-relaxed-constexpr"]
     ext_modules = [
         cpp_extension.CUDAExtension(
             name="torch_fpsample._core",
